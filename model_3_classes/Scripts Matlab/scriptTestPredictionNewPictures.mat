@@ -1,0 +1,24 @@
+
+% TESTs
+% examples of images
+% 4d9fc85a8259 severe \Severe
+% 50a2aef380c8 severe
+% 299086c6d1b5 severe
+% d035c2bd9104 severe
+% f9156aeffc5e severe
+% dbb2c63f6f08 normalement severe => donne moderate => erreur
+% 0c7e82daf5a0 moderate \Moderate
+% 59ee65760535 moderate
+% add1d681d712 moderate
+% b9127e38d9b9 moderate
+% ff0740cb484a moderate
+desiredSize = [227 227];
+imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\maladieAvance\299086c6d1b5.png';
+% imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\maladieAvance\f9156aeffc5e.png';
+% imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\maladieDebut\59ee65760535.png';
+% imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\maladieDebut\b9127e38d9b9.png';
+% imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\oeil_sain\0c43c79e8cfb.png';
+% imagePath = 'C:\Users\Hp\OneDrive\Bureau\DataSet\oeil_sain\1dfe599d12a9.png';
+originalImage = imread(imagePath);
+newImage = imresize(originalImage, desiredSize, 'OutputSize', [227 227]);
+predictedLabel = classify(model, newImage);

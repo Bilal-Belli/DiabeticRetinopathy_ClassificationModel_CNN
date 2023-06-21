@@ -1,0 +1,4 @@
+First import this directory in matlab
+Second execute scriptModelCreation.mat
+Then execute scriptPerformanceMesure.mat   for viewing the performances
+Finally execute scriptTestPredictionNewPictures.mat   for testing images

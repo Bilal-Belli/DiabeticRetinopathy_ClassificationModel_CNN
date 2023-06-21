@@ -1,0 +1,53 @@
+% CODE MATLAB UTLISER
+dataRoot = 'C:\Users\Hp\OneDrive\Bureau\DataSet';
+classNames = {'maladieAvance','maladieDebut','oeil_sain'};
+imageSize = [227, 227];
+
+% stockage en variable image dataset (imds)
+imds = imageDatastore(fullfile(dataRoot, classNames), 'LabelSource', 'foldernames', 'FileExtensions', {'.jpg', '.png'});
+numClasses = numel(classNames);
+
+% specification du pourcentage d'entrainment (80%)
+trainPercentage = 80;
+
+% Diviser l'ensemble de données en ensembles d'apprentissage et de validation
+[trainImds, valImds] = splitEachLabel(imds, trainPercentage, 'randomized');
+
+% Augmentés données (d'entrainment et de validation)
+augmentedTrainingSet = augmentedImageDatastore(imageSize, trainImds);
+augmentedValidationSet = augmentedImageDatastore(imageSize, valImds);
+
+% modele
+baseModel = alexnet;
+numClassesBaseModel = numel(baseModel.Layers(end).ClassNames);
+layers = [
+    baseModel.Layers(1:end-3)
+    fullyConnectedLayer(numClasses, 'Name', 'fc_custom')
+    softmaxLayer('Name', 'softmax')
+    classificationLayer('Name', 'classification')
+];
+
+% Définir les options d'entraînement
+options = trainingOptions('adam', ...
+    'MiniBatchSize', 64, ...
+    'MaxEpochs', 10, ...
+    'InitialLearnRate', 1e-4, ...
+    'ValidationData', augmentedValidationSet, ...
+    'ValidationFrequency', floor(numel(trainImds.Files)/32), ...
+    'Verbose', true, ...
+    'Plots', 'training-progress');
+
+% algorithme d'optimisation Adam ('adam') pour l'entraînement
+% La taille du mini-lot (ensemble images pour chaque iteration) (MiniBatchSize) est définie à 32
+% Le modèle est entraîné pendant un maximum de 10 époques (MaxEpochs)
+% Le taux d'apprentissage initial (InitialLearnRate) est fixé à 0,0001
+% La fréquence de validation (ValidationFrequency) est définie sur une valeur calculée en fonction du nombre d'images d'entraînement
+% L'affichage des informations d'entraînement est activé (Verbose)
+
+% Trainer le modèle
+model = trainNetwork(augmentedTrainingSet, layers, options);
+
+% pour pouvoir faire les evaluations
+predictedLabelsVal = classify(model, augmentedValidationSet);
+valAccuracy = mean(predictedLabelsVal == valImds.Labels);
+fprintf('Validation Accuracy: %.2f%%\n', valAccuracy * 100);

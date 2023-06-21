@@ -1,0 +1,155 @@
+% CODE MATLAB UTLISER
+dataRoot = 'C:\Users\Hp\Downloads\DataSet';
+classNames = {'Mild', 'Moderate', 'No_DR', 'Proliferate_DR', 'Severe'};
+imageSize = [227, 227];
+
+% stockage en variable image dataset (imds)
+imds = imageDatastore(fullfile(dataRoot, classNames), 'LabelSource', 'foldernames', 'FileExtensions', {'.jpg', '.png'});
+numClasses = numel(classNames);
+numImages = countEachLabel(imds);
+
+% specification du pourcentage d'entrainment (80%)
+trainPercentage = 80;
+
+% Diviser l'ensemble de données en ensembles d'apprentissage et de validation
+[trainImds, valImds] = splitEachLabel(imds, trainPercentage, 'randomized');
+
+% Augmentés données (d'entrainment et de validation)
+augmentedTrainingSet = augmentedImageDatastore(imageSize, trainImds);
+augmentedValidationSet = augmentedImageDatastore(imageSize, valImds);
+
+% modele
+baseModel = alexnet;
+% Modifier la dernière couche entièrement connectée du modèle de base pour le nombre de classes
+numClassesBaseModel = numel(baseModel.Layers(end).ClassNames);
+layers = [
+    baseModel.Layers(1:end-3)
+    fullyConnectedLayer(numClasses, 'Name', 'fc_custom')
+    softmaxLayer('Name', 'softmax')
+    classificationLayer('Name', 'classification')
+];
+
+% Définir les options d'entraînement
+options = trainingOptions('adam', ...
+    'MiniBatchSize'         , 32, ...
+    'MaxEpochs'             , 10, ...
+    'InitialLearnRate'      , 1e-4, ...
+    'ValidationData'        , augmentedValidationSet, ...
+    'ValidationFrequency'   , floor(numel(trainImds.Files)/32), ...
+    'Verbose'               , true, ...
+    'Plots'                 , 'training-progress');
+
+% algorithme d'optimisation Adam ('adam') pour l'entraînement
+% La taille du mini-lot (ensemble images pour chaque iteration) (MiniBatchSize) est définie à 32
+% Le modèle est entraîné pendant un maximum de 10 époques (MaxEpochs)
+% Le taux d'apprentissage initial (InitialLearnRate) est fixé à 0,0001
+% La fréquence de validation (ValidationFrequency) est définie sur une valeur calculée en fonction du nombre d'images d'entraînement
+% L'affichage des informations d'entraînement est activé (Verbose)
+
+% Trainer le modèle
+model = trainNetwork(augmentedTrainingSet, layers, options);
+
+%--------------------------------------------------------------------------------
+% ACCURACY
+accuracy = sum(predictedLabelsVal == trueLabelsVal) / numel(trueLabelsVal);
+fprintf('Accuracy: %.2f%%\n', accuracy * 100);
+
+
+% PRECISION-RECALL Curve for ALL CLASSES
+classNames = {'Mild', 'Moderate', 'No_DR', 'Proliferate_DR', 'Severe'};
+for i = 1:numel(classNames)
+    % Get the predicted scores and true labels for the current class
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    % Sort the scores in descending order
+    [sortedScores, sortedIndices] = sort(predictedScores, 'descend');
+    sortedLabels = trueLabels(sortedIndices);
+    % Compute the cumulative sum of the sorted labels
+    cumulativeTP = cumsum(sortedLabels);
+    cumulativeFP = cumsum(~sortedLabels);
+    % Compute precision and recall
+    precision = cumulativeTP ./ (cumulativeTP + cumulativeFP);
+    recall = cumulativeTP / sum(trueLabels);
+    % Plot Precision-Recall curve
+    figure;
+    plot(recall, precision);
+    xlabel('Recall');
+    ylabel('Precision');
+    title(['Precision-Recall Curve for ', classNames{i}]);
+end
+
+
+%MATRICE DE CONFUSION
+% Get the true labels from the validation dataset
+trueLabelsVal = valImds.Labels;
+% Compute the confusion matrix
+confusionMatrix = confusionmat(trueLabelsVal, predictedLabelsVal);
+% Display the confusion matrix as a heatmap
+figure;
+heatmap(classNames, classNames, confusionMatrix);
+title('Confusion Matrix');
+xlabel('Predicted Labels');
+ylabel('True Labels');
+
+
+% TRUE POSITIVE AND FALSE POSITIVE (ALL EACH SEUL)
+classNames = {'Mild', 'Moderate', 'No_DR', 'Proliferate_DR', 'Severe'};
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    [X,Y,T,AUC] = perfcurve(trueLabels, predictedScores, true, 'xCrit', 'FPR', 'yCrit', 'TPR');
+    figure;
+    plot(X, Y);
+    xlabel('False Positive Rate');
+    ylabel('True Positive Rate');
+    title(['ROC Curve for ', classNames{i}, ' (AUC = ', num2str(AUC), ')']);
+    grid on;
+end
+
+
+% TRUE POSITIVE AND FALSE POSITIVE (ALL IN ONE)
+% Multi-Class ROC Curve
+classNames = {'Mild', 'Moderate', 'No_DR', 'Proliferate_DR', 'Severe'};
+% Initialize arrays to store true labels and predicted scores
+allTrueLabels = [];
+allPredictedScores = [];
+% Loop over each class and collect true labels and predicted scores
+for i = 1:numel(classNames)
+    % Get the predicted scores and true labels for the current class
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    % Append the true labels and predicted scores
+    allTrueLabels = [allTrueLabels; trueLabels];
+    allPredictedScores = [allPredictedScores; predictedScores];
+end
+% Generate the multi-class ROC curve
+[X,Y,~,AUC] = perfcurve(allTrueLabels, allPredictedScores, true, 'xCrit', 'FPR', 'yCrit', 'TPR');
+% Plot the multi-class ROC curve
+figure;
+plot(X, Y);
+xlabel('False Positive Rate');
+ylabel('True Positive Rate');
+title(['Multi-Class ROC Curve (AUC = ', num2str(AUC), ')']);
+grid on;
+
+
+% TRUE POSITIVE AND FALSE NEGATIVE (ALL IN ONE)
+classNames = {'Mild', 'Moderate', 'No_DR', 'Proliferate_DR', 'Severe'};
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    threshold = 0.5;
+    binaryPredictions = predictedScores >= threshold;
+    TN = sum(~binaryPredictions & ~trueLabels);
+    FN = sum(~binaryPredictions & trueLabels);
+    TNR = TN / sum(~trueLabels);
+    FNR = FN / sum(trueLabels);
+    figure;
+    plot(FNR, TNR, 'ro');
+    xlabel('False Negative Rate');
+    ylabel('True Negative Rate');
+    title(['True and False Negative Curve for ', classNames{i}]);
+    xlim([0, 1]);
+    ylim([0, 1]);
+    grid on;
+end

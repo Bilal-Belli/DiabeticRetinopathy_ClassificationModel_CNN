@@ -1,0 +1,93 @@
+% Graphiques pour mesurer la performance du modele
+%--------------------------------------------------------------------------------
+% ACCURACY
+accuracy = sum(predictedLabelsVal == trueLabelsVal) / numel(trueLabelsVal);
+fprintf('Accuracy: %.2f%%\n', accuracy * 100);
+
+
+[~, scores] = classify(model, augmentedValidationSet);
+[~, ~, ~, AUC] = perfcurve(trueLabelsVal, scores(:, 2), 'Proliferate_DR');
+
+% PRECISION-RECALL Curve for ALL CLASSES
+classNames = {'maladieAvance','maladieDebut','oeil_sain'};
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i);
+    trueLabels = trueLabelsVal == classNames{i};
+    [sortedScores, sortedIndices] = sort(predictedScores, 'descend');
+    sortedLabels = trueLabels(sortedIndices);
+    cumulativeTP = cumsum(sortedLabels);
+    cumulativeFP = cumsum(~sortedLabels);
+    precision = cumulativeTP ./ (cumulativeTP + cumulativeFP);
+    recall = cumulativeTP / sum(trueLabels);
+    figure;
+    plot(recall, precision);
+    xlabel('Recall');
+    ylabel('Precision');
+    title(['Precision-Recall Curve for ', classNames{i}]);
+end
+
+
+%MATRICE DE CONFUSION
+trueLabelsVal = valImds.Labels;
+confusionMatrix = confusionmat(trueLabelsVal, predictedLabelsVal);
+figure;
+heatmap(classNames, classNames, confusionMatrix);
+title('Confusion Matrix');
+xlabel('Predicted Labels');
+ylabel('True Labels');
+
+
+% TRUE POSITIVE AND FALSE POSITIVE (ALL EACH SEUL)
+classNames = {'maladieAvance','maladieDebut','oeil_sain'};
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i);
+    trueLabels = trueLabelsVal == classNames{i};
+    [X,Y,T,AUC] = perfcurve(trueLabels, predictedScores, true, 'xCrit', 'FPR', 'yCrit', 'TPR');
+    figure;
+    plot(X, Y);
+    xlabel('False Positive Rate');
+    ylabel('True Positive Rate');
+    title(['ROC Curve for ', classNames{i}, ' (AUC = ', num2str(AUC), ')']);
+    grid on;
+end
+
+
+% TRUE POSITIVE AND FALSE POSITIVE (ALL IN ONE)
+classNames = {'maladieAvance','maladieDebut','oeil_sain'};
+allTrueLabels = [];
+allPredictedScores = [];
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    allTrueLabels = [allTrueLabels; trueLabels];
+    allPredictedScores = [allPredictedScores; predictedScores];
+end
+[X,Y,~,AUC] = perfcurve(allTrueLabels, allPredictedScores, true, 'xCrit', 'FPR', 'yCrit', 'TPR');
+figure;
+plot(X, Y);
+xlabel('False Positive Rate');
+ylabel('True Positive Rate');
+title(['Multi-Class ROC Curve (AUC = ', num2str(AUC), ')']);
+grid on;
+
+
+% TRUE POSITIVE AND FALSE NEGATIVE (ALL IN ONE)
+classNames = {'maladieAvance','maladieDebut','oeil_sain'};
+for i = 1:numel(classNames)
+    predictedScores = scores(:, i); % Scores for class i
+    trueLabels = trueLabelsVal == classNames{i};
+    threshold = 0.5;
+    binaryPredictions = predictedScores >= threshold;
+    TN = sum(~binaryPredictions & ~trueLabels);
+    FN = sum(~binaryPredictions & trueLabels);
+    TNR = TN / sum(~trueLabels);
+    FNR = FN / sum(trueLabels);
+    figure;
+    plot(FNR, TNR, 'ro');
+    xlabel('False Negative Rate');
+    ylabel('True Negative Rate');
+    title(['True and False Negative Curve for ', classNames{i}]);
+    xlim([0, 1]);
+    ylim([0, 1]);
+    grid on;
+end

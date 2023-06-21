@@ -1,0 +1,26 @@
+% 4d9fc85a8259 severe \Severe
+% 50a2aef380c8 severe
+% 299086c6d1b5 severe
+% d035c2bd9104 severe
+% f9156aeffc5e severe
+% dbb2c63f6f08 normalement severe => donne moderate => erreur
+
+% 0c7e82daf5a0 moderate \Moderate
+% 59ee65760535 moderate
+% add1d681d712 moderate
+% b9127e38d9b9 moderate
+% ff0740cb484a moderate
+
+desiredSize = [227 227];
+
+% Download DataSet from link: https://www.kaggle.com/code/parisanahmadi/dl-diabetic-retinopathycdetection-95-acc-cnn?scriptVersionId=102744745
+imagePath = 'DataSet\No_DR\4a96c28f3f07.png';
+
+originalImage = imread(imagePath);
+newImage = imresize(originalImage, desiredSize, 'OutputSize', [227 227]);
+predictedLabel = classify(model, newImage);
+
+% Evaluate the performance on the validation set
+predictedLabelsVal = classify(model, augmentedValidationSet);
+valAccuracy = mean(predictedLabelsVal == valImds.Labels);
+fprintf('Validation Accuracy: %.2f%%\n', valAccuracy * 100);
